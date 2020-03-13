@@ -100,11 +100,7 @@ class Config(object):
     # Input/output codecs.
     input_codec = 'utf-8'
     output_codec = 'utf-8'
-    # Functions to do the i/o conversion.
-    def enc(self, text):
-        return text.encode(self.output_codec, 'replace')
-    def dec(self, text):
-        return text.decode(self.input_codec, 'replace')
+
     # Write out select logfiles
     update_realtime = True
     # CSS configs:
@@ -200,18 +196,9 @@ class Config(object):
                 continue
             text = writer.format(extension)
             results[extension] = text
-            # If the writer returns a string or unicode object, then
-            # we should write it to a filename with that extension.
-            # If it doesn't, then it's assumed that the write took
-            # care of writing (or publishing or emailing or wikifying)
-            # it itself.
-            if isinstance(text, str):
-                text = self.enc(text)
-            if isinstance(text, str):
-                # Have a way to override saving, so no disk files are written.
-                if getattr(self, "dontSave", False):
-                    continue
-                self.writeToFile(text, rawname+extension)
+            if getattr(self, "dontSave", False):
+                continue
+            self.writeToFile(text, rawname+extension)
         if hasattr(self, 'save_hook'):
             self.save_hook(realtime_update=realtime_update)
         return results
@@ -220,11 +207,12 @@ class Config(object):
         """Write a given string to a file"""
         # The reason we have this method just for this is to proxy
         # through the _restrictPermissions logic.
-        f = open(filename, 'w')
-        if self.M._restrictlogs:
-            self.restrictPermissions(f)
-        f.write(string)
-        f.close()
+
+        with open(filename, 'w', encoding=self.output_codec) as f:
+            if self.M._restrictlogs:
+                self.restrictPermissions(f)
+            f.write(string)
+
     def restrictPermissions(self, f):
         """Remove the permissions given in the variable RestrictPerm."""
         f.flush()
@@ -475,10 +463,7 @@ class Meeting(MeetingCommands, object):
         self.owner = owner
         self.channel = channel
         self.currenttopic = ""
-        if oldtopic:
-            self.oldtopic = self.config.dec(oldtopic)
-        else:
-            self.oldtopic = None
+        self.oldtopic = oldtopic
         self.lines = []
         self.minutes = []
         self.attendees = {}
@@ -495,15 +480,16 @@ class Meeting(MeetingCommands, object):
     def reply(self, x):
         """Send a reply to the IRC channel."""
         if hasattr(self, '_sendReply') and not self._lurk:
-            self._sendReply(self.config.enc(x))
+            self._sendReply(x)
         else:
-            print("REPLY:", self.config.enc(x))
+            print("REPLY:", x)
+
     def topic(self, x):
         """Set the topic in the IRC channel."""
         if hasattr(self, '_setTopic') and not self._lurk:
-            self._setTopic(self.config.enc(x))
+            self._setTopic(x)
         else:
-            print("TOPIC:", self.config.enc(x))
+            print("TOPIC:", x)
 
     def settopic(self):
         "The actual code to set the topic"
@@ -554,8 +540,6 @@ class Meeting(MeetingCommands, object):
     def addrawline(self, nick, line, time_=None):
         """This adds a line to the log, bypassing command execution.
         """
-        nick = self.config.dec(nick)
-        line = self.config.dec(line)
         self.addnick(nick)
         line = line.strip(' \x01')  # \x01 is present in ACTIONs
         # Setting a custom time is useful when replying logs,
@@ -645,7 +629,7 @@ if __name__ == '__main__':
 
         M = Meeting(channel=channel, owner=None,
                     filename=filename, writeRawLog=False)
-        for line in open(sys.argv[2]):
+        for line in open(sys.argv[2], encoding=M.config.input_codec):
             # match regular spoken lines:
             m = logline_re.match(line)
             if m:
