@@ -35,11 +35,11 @@ import types
 import supybot.conf as conf
 import supybot.registry as registry
 
-from . import meeting
 from . import writers
 
 # The plugin group for configuration
 MeetBotConfigGroup = conf.registerPlugin('MeetBot')
+
 
 class WriterMap(registry.String):
     """List of output formats to write.  This is a space-separated
@@ -48,28 +48,26 @@ class WriterMap(registry.String):
     """
     def set(self, s):
         s = s.split()
-        writer_map = { }
+        writer_map = {}
         for writer in s:
-            #from fitz import interact ; interact.interact()
             writer, ext = writer.split(':')
             if not hasattr(writers, writer):
-                raise ValueError("Writer name not found: %s"%writer)
-            #if len(ext) < 2 or ext[0] != '.':
-            #    raise ValueError("Extension must start with '.' and have "
-            #                     "at least one more character.")
+                raise ValueError("Writer name not found: %s" % writer)
             writer_map[ext] = getattr(writers, writer)
         self.setValue(writer_map)
+
     def setValue(self, writer_map):
         for e, w in writer_map.items():
             if not hasattr(w, "format"):
-                raise ValueError("Writer %s must have method .format()"%
-                                 w.__name__)
+                raise ValueError(
+                    "Writer %s must have method .format()" % w.__name__)
             self.value = writer_map
+
     def __str__(self):
-        writers_string = [ ]
+        writers_string = []
         for ext, w in self.value.items():
             name = w.__name__
-            writers_string.append("%s:%s"%(name, ext))
+            writers_string.append("%s:%s" % (name, ext))
         return " ".join(writers_string)
 
 
@@ -78,7 +76,7 @@ class SupybotConfigProxy(object):
         """Do the regular default configuration, and sta"""
         OriginalConfig = self.__OriginalConfig
         self.__C = OriginalConfig(*args, **kwargs)
-    
+
     def __getattr__(self, attrname):
         """Try to get the value from the supybot registry.  If it's in
         the registry, return it.  If it's not, then proxy it to th.
@@ -104,20 +102,24 @@ class SupybotConfigProxy(object):
         # values).  This will slow things down a little bit, but
         # that's just the cost of duing business.
         if hasattr(value, 'im_func'):
-            return types.MethodType(value.__func__, self, value.__self__.__class__)
+            return types.MethodType(
+                value.__func__, self, value.__self__.__class__)
         return value
 
 
+use_supybot_config = conf.registerGlobalValue(
+    MeetBotConfigGroup, 'enableSupybotBasedConfig', registry.Boolean(False, '')
+)
 
-#conf.registerGlobalValue(MeetBot
-use_supybot_config = conf.registerGlobalValue(MeetBotConfigGroup,
-                                              'enableSupybotBasedConfig',
-                                              registry.Boolean(False, ''))
+
 def is_supybotconfig_enabled(OriginalConfig):
     return (use_supybot_config.value and
             not getattr(OriginalConfig, 'dontBotConfig', False))
 
-settable_attributes = [ ]
+
+settable_attributes = []
+
+
 def setup_config(OriginalConfig):
     # Set all string variables in the default Config class as supybot
     # registry variables.
@@ -132,25 +134,22 @@ def setup_config(OriginalConfig):
             # For a global value: conf.registerGlobalValue and remove the
             # channel= option from registryValue call above.
             conf.registerChannelValue(MeetBotConfigGroup, attrname,
-                                      registry.String(attr,""))
+                                      registry.String(attr, ""))
             settable_attributes.append(attrname)
         if isinstance(attr, bool):
             conf.registerChannelValue(MeetBotConfigGroup, attrname,
-                                      registry.Boolean(attr,""))
+                                      registry.Boolean(attr, ""))
             settable_attributes.append(attrname)
 
     # writer_map
-    # (doing the commented out commands below will erase the previously
-    # stored value of a config variable)
-    #if 'writer_map' in MeetBotConfigGroup._children:
-    #    MeetBotConfigGroup.unregister('writer_map')
-    conf.registerChannelValue(MeetBotConfigGroup, 'writer_map',
-                      WriterMap(OriginalConfig.writer_map, ""))
+    conf.registerChannelValue(
+        MeetBotConfigGroup, 'writer_map',
+        WriterMap(OriginalConfig.writer_map, "")
+    )
     settable_attributes.append('writer_map')
+
 
 def get_config_proxy(OriginalConfig):
     # Here is where the real proxying occurs.
     SupybotConfigProxy._SupybotConfigProxy__OriginalConfig = OriginalConfig
     return SupybotConfigProxy
-
-

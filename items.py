@@ -29,12 +29,10 @@
 # POSSIBILITY OF SUCH DAMAGE.
 ###
 
-import os
 import time
 
 from . import writers
-#from writers import html, rst
-import itertools
+
 
 def inbase(i, chars='abcdefghijklmnopqrstuvwxyz', place=0):
     """Converts an integer into a postfix in base 26 using ascii chars.
@@ -48,14 +46,12 @@ def inbase(i, chars='abcdefghijklmnopqrstuvwxyz', place=0):
     if div == 0:
         return chars[mod]
     else:
-        return inbase2(div, chars=chars, place=place+1)+chars[mod]
+        return inbase(div, chars=chars, place=place+1)+chars[mod]
 
 
-
-#
 # These are objects which we can add to the meeting minutes.  Mainly
 # they exist to aid in HTML-formatting.
-#
+
 class _BaseItem(object):
     itemtype = None
     starthtml = ''
@@ -64,10 +60,12 @@ class _BaseItem(object):
     endrst = ''
     starttext = ''
     endtext = ''
+
     def get_replacements(self, escapewith):
-        replacements = { }
+        replacements = {}
         for name in dir(self):
-            if name[0] == "_": continue
+            if name[0] == "_":
+                continue
             replacements[name] = getattr(self, name)
         replacements['nick'] = escapewith(replacements['nick'])
         if 'line' in replacements:
@@ -75,153 +73,199 @@ class _BaseItem(object):
         if 'topic' in replacements:
             replacements['topic'] = escapewith(replacements['topic'])
         return replacements
+
     def makeRSTref(self, M):
         if self.nick[-1] == '_':
-            rstref = rstref_orig = "%s%s"%(self.nick, self.time)
+            rstref = rstref_orig = "%s%s" % (self.nick, self.time)
         else:
-            rstref = rstref_orig = "%s-%s"%(self.nick, self.time)
+            rstref = rstref_orig = "%s-%s" % (self.nick, self.time)
         count = 0
         while rstref in M.rst_refs:
             rstref = rstref_orig + inbase(count)
             count += 1
         link = self.logURL(M)
-        M.rst_urls.append(".. _%s: %s"%(rstref, link+"#"+self.anchor))
+        M.rst_urls.append(".. _%s: %s" % (rstref, link+"#"+self.anchor))
         M.rst_refs[rstref] = True
         return rstref
+
     @property
     def anchor(self):
         return 'l-'+str(self.linenum)
+
     def logURL(self, M):
         return M.config.basename+'.log.html'
 
+
 class Topic(_BaseItem):
     itemtype = 'TOPIC'
-    html_template = """<tr><td><a href='%(link)s#%(anchor)s'>%(time)s</a></td>
-        <th colspan=3>%(starthtml)sTopic: %(topic)s%(endhtml)s</th>
-        </tr>"""
-    #html2_template = ("""<b>%(starthtml)s%(topic)s%(endhtml)s</b> """
-    #                  """(%(nick)s, <a href='%(link)s#%(anchor)s'>%(time)s</a>)""")
-    html2_template = ("""%(starthtml)s%(topic)s%(endhtml)s """
-                      """<span class="details">"""
-                      """(<a href='%(link)s#%(anchor)s'>%(nick)s</a>, """
-                      """%(time)s)"""
-                      """</span>""")
-    rst_template = """%(startrst)s%(topic)s%(endrst)s  (%(rstref)s_)"""
-    text_template = """%(starttext)s%(topic)s%(endtext)s  (%(nick)s, %(time)s)"""
+    html_template = (
+        '<tr><td><a href="%(link)s#%(anchor)s">%(time)s</a></td>'
+        '<th colspan=3>%(starthtml)sTopic: %(topic)s%(endhtml)s</th>'
+        '</tr>')
+    html2_template = (
+        '%(starthtml)s%(topic)s%(endhtml)s '
+        '<span class="details">'
+        '(<a href="%(link)s#%(anchor)s">%(nick)s</a>, '
+        '%(time)s)'
+        '</span>')
+    rst_template = "%(startrst)s%(topic)s%(endrst)s  (%(rstref)s_)"
+    text_template = "%(starttext)s%(topic)s%(endtext)s  (%(nick)s, %(time)s)"
     startrst = '**'
     endrst = '**'
     starthtml = '<b class="TOPIC">'
     endhtml = '</b>'
+
     def __init__(self, nick, line, linenum, time_):
-        self.nick = nick ; self.topic = line ; self.linenum = linenum
+        self.nick = nick
+        self.topic = line
+        self.linenum = linenum
         self.time = time.strftime("%H:%M:%S", time_)
+
     def _htmlrepl(self, M):
         repl = self.get_replacements(escapewith=writers.html)
         repl['link'] = self.logURL(M)
         return repl
+
     def html(self, M):
-        return self.html_template%self._htmlrepl(M)
+        return self.html_template % self._htmlrepl(M)
+
     def html2(self, M):
-        return self.html2_template%self._htmlrepl(M)
+        return self.html2_template % self._htmlrepl(M)
+
     def rst(self, M):
         self.rstref = self.makeRSTref(M)
         repl = self.get_replacements(escapewith=writers.rst)
-        if repl['topic']=='': repl['topic']=' '
+        if repl['topic'] == '':
+            repl['topic'] = ' '
         repl['link'] = self.logURL(M)
-        return self.rst_template%repl
+        return self.rst_template % repl
+
     def text(self, M):
         repl = self.get_replacements(escapewith=writers.text)
         repl['link'] = self.logURL(M)
-        return self.text_template%repl
+        return self.text_template % repl
+
 
 class GenericItem(_BaseItem):
     itemtype = ''
-    html_template = """<tr><td><a href='%(link)s#%(anchor)s'>%(time)s</a></td>
-        <td>%(itemtype)s</td><td>%(nick)s</td><td>%(starthtml)s%(line)s%(endhtml)s</td>
-        </tr>"""
-    #html2_template = ("""<i>%(itemtype)s</i>: %(starthtml)s%(line)s%(endhtml)s """
-    #                  """(%(nick)s, <a href='%(link)s#%(anchor)s'>%(time)s</a>)""")
-    html2_template = ("""<i class="itemtype">%(itemtype)s</i>: """
-                      """<span class="%(itemtype)s">"""
-                      """%(starthtml)s%(line)s%(endhtml)s</span> """
-                      """<span class="details">"""
-                      """(<a href='%(link)s#%(anchor)s'>%(nick)s</a>, """
-                      """%(time)s)"""
-                      """</span>""")
-    rst_template = """*%(itemtype)s*: %(startrst)s%(line)s%(endrst)s  (%(rstref)s_)"""
-    text_template = """%(itemtype)s: %(starttext)s%(line)s%(endtext)s  (%(nick)s, %(time)s)"""
+    html_template = (
+        '<tr><td><a href="%(link)s#%(anchor)s">%(time)s</a></td>'
+        '<td>%(itemtype)s</td><td>%(nick)s</td>'
+        '<td>%(starthtml)s%(line)s%(endhtml)s</td></tr>')
+    html2_template = (
+        '<i class="itemtype">%(itemtype)s</i>: '
+        '<span class="%(itemtype)s">'
+        '%(starthtml)s%(line)s%(endhtml)s</span> '
+        '<span class="details">'
+        '(<a href="%(link)s#%(anchor)s">%(nick)s</a>, '
+        '%(time)s)</span>')
+    rst_template = \
+        '*%(itemtype)s*: %(startrst)s%(line)s%(endrst)s  (%(rstref)s_)'
+    text_template = \
+        '%(itemtype)s: %(starttext)s%(line)s%(endtext)s  (%(nick)s, %(time)s)'
+
     def __init__(self, nick, line, linenum, time_):
-        self.nick = nick ; self.line = line ; self.linenum = linenum
+        self.nick = nick
+        self.line = line
+        self.linenum = linenum
         self.time = time.strftime("%H:%M:%S", time_)
+
     def _htmlrepl(self, M):
         repl = self.get_replacements(escapewith=writers.html)
         repl['link'] = self.logURL(M)
         return repl
+
     def html(self, M):
-        return self.html_template%self._htmlrepl(M)
+        return self.html_template % self._htmlrepl(M)
+
     def html2(self, M):
-        return self.html2_template%self._htmlrepl(M)
+        return self.html2_template % self._htmlrepl(M)
+
     def rst(self, M):
         self.rstref = self.makeRSTref(M)
         repl = self.get_replacements(escapewith=writers.rst)
         repl['link'] = self.logURL(M)
-        return self.rst_template%repl
+        return self.rst_template % repl
+
     def text(self, M):
         repl = self.get_replacements(escapewith=writers.text)
         repl['link'] = self.logURL(M)
-        return self.text_template%repl
+        return self.text_template % repl
 
 
 class Info(GenericItem):
     itemtype = 'INFO'
-    html2_template = ("""<span class="%(itemtype)s">"""
-                      """%(starthtml)s%(line)s%(endhtml)s</span> """
-                      """<span class="details">"""
-                      """(<a href='%(link)s#%(anchor)s'>%(nick)s</a>, """
-                      """%(time)s)"""
-                      """</span>""")
-    rst_template = """%(startrst)s%(line)s%(endrst)s  (%(rstref)s_)"""
-    text_template = """%(starttext)s%(line)s%(endtext)s  (%(nick)s, %(time)s)"""
+    html2_template = (
+        '<span class="%(itemtype)s">'
+        '%(starthtml)s%(line)s%(endhtml)s</span> '
+        '<span class="details">'
+        '(<a href="%(link)s#%(anchor)s">%(nick)s</a>, '
+        '%(time)s)</span>')
+    rst_template = '%(startrst)s%(line)s%(endrst)s  (%(rstref)s_)'
+    text_template = '%(starttext)s%(line)s%(endtext)s  (%(nick)s, %(time)s)'
+
+
 class Idea(GenericItem):
     itemtype = 'IDEA'
+
+
 class Agreed(GenericItem):
     itemtype = 'AGREED'
+
+
 class Action(GenericItem):
     itemtype = 'ACTION'
+
+
 class Help(GenericItem):
     itemtype = 'HELP'
+
+
 class Accepted(GenericItem):
     itemtype = 'ACCEPTED'
     starthtml = '<font color="green">'
     endhtml = '</font>'
+
+
 class Rejected(GenericItem):
     itemtype = 'REJECTED'
     starthtml = '<font color="red">'
     endhtml = '</font>'
+
+
 class Link(_BaseItem):
     itemtype = 'LINK'
-    html_template = """<tr><td><a href='%(link)s#%(anchor)s'>%(time)s</a></td>
-        <td>%(itemtype)s</td><td>%(nick)s</td><td>%(starthtml)s<a href="%(url)s">%(url_readable)s</a> %(line)s%(endhtml)s</td>
-        </tr>"""
-    #html2_template = ("""<i>%(itemtype)s</i>: %(starthtml)s<a href="%(url)s">%(url_readable)s</a> %(line)s%(endhtml)s """
-    #                  """(%(nick)s, <a href='%(link)s#%(anchor)s'>%(time)s</a>)""")
-    #html2_template = ("""<i>%(itemtype)s</i>: %(starthtml)s<a href="%(url)s">%(url_readable)s</a> %(line)s%(endhtml)s """
-    #                  """(<a href='%(link)s#%(anchor)s'>%(nick)s</a>, %(time)s)""")
-    html2_template = ("""%(starthtml)s<a href="%(url)s">%(url_readable)s</a> %(line)s%(endhtml)s """
-                      """<span class="details">"""
-                      """(<a href='%(link)s#%(anchor)s'>%(nick)s</a>, """
-                      """%(time)s)"""
-                      """</span>""")
-    rst_template = """*%(itemtype)s*: %(startrst)s%(url)s %(line)s%(endrst)s  (%(rstref)s_)"""
-    text_template = """%(itemtype)s: %(starttext)s%(url)s %(line)s%(endtext)s  (%(nick)s, %(time)s)"""
+    html_template = (
+        '<tr><td><a href="%(link)s#%(anchor)s">%(time)s</a></td>'
+        '<td>%(itemtype)s</td><td>%(nick)s</td><td>%(starthtml)s'
+        '<a href="%(url)s">%(url_readable)s</a> %(line)s%(endhtml)s</td>'
+        '</tr>'
+    )
+    html2_template = (
+        '%(starthtml)s<a href="%(url)s">%(url_readable)s</a> '
+        '%(line)s%(endhtml)s '
+        '<span class="details">'
+        '(<a href="%(link)s#%(anchor)s">%(nick)s</a>, '
+        '%(time)s)</span>'
+    )
+    rst_template = (
+        '*%(itemtype)s*: %(startrst)s%(url)s %(line)s%(endrst)s  (%(rstref)s_)'
+    )
+    text_template = (
+        '%(itemtype)s: %(starttext)s%(url)s %(line)s%(endtext)s  '
+        '(%(nick)s, %(time)s)'
+    )
+
     def __init__(self, nick, line, linenum, time_):
-        self.nick = nick ; self.linenum = linenum
+        self.nick = nick
+        self.linenum = linenum
         self.time = time.strftime("%H:%M:%S", time_)
         self.url, self.line = (line+' ').split(' ', 1)
         # URL-sanitization
-        self.url_readable = self.url # readable line version
+        self.url_readable = self.url  # readable line version
         self.url = self.url
         self.line = self.line.strip()
+
     def _htmlrepl(self, M):
         repl = self.get_replacements(escapewith=writers.html)
         # special: replace doublequote only for the URL.
@@ -229,17 +273,20 @@ class Link(_BaseItem):
         repl['url_readable'] = writers.html(self.url)
         repl['link'] = self.logURL(M)
         return repl
+
     def html(self, M):
-        return self.html_template%self._htmlrepl(M)
+        return self.html_template % self._htmlrepl(M)
+
     def html2(self, M):
-        return self.html2_template%self._htmlrepl(M)
+        return self.html2_template % self._htmlrepl(M)
+
     def rst(self, M):
         self.rstref = self.makeRSTref(M)
         repl = self.get_replacements(escapewith=writers.rst)
         repl['link'] = self.logURL(M)
-        #repl['url'] = writers.rst(self.url)
-        return self.rst_template%repl
+        return self.rst_template % repl
+
     def text(self, M):
         repl = self.get_replacements(escapewith=writers.text)
         repl['link'] = self.logURL(M)
-        return self.text_template%repl
+        return self.text_template % repl

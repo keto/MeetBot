@@ -9,6 +9,7 @@ import meeting
 
 running_tests = True
 
+
 class MeetBotTest(unittest.TestCase):
 
     def test_replay(self):
@@ -17,7 +18,13 @@ class MeetBotTest(unittest.TestCase):
         sys.argv[1:] = ["replay", "test-script-1.log.txt"]
         sys.path.insert(0, "..")
         try:
-            exec(compile(open("../meeting.py", "rb").read(), "../meeting.py", 'exec'), globals())
+            exec(
+                compile(
+                    open("../meeting.py", "rb").read(),
+                    "../meeting.py", 'exec'
+                ),
+                globals()
+            )
         finally:
             del sys.path[0]
 
@@ -56,64 +63,75 @@ class MeetBotTest(unittest.TestCase):
         self.test_css_file_embed()
         self.test_css_file()
         self.test_css_none()
+
     def test_css_embed(self):
-        extraConfig={ }
         results = self.M_trivial(extraConfig={}).save()
         self.assertTrue('<link rel="stylesheet" ' not in results['.html'])
-        self.assertTrue('body {'                      in results['.html'])
+        self.assertTrue('body {' in results['.html'])
         self.assertTrue('<link rel="stylesheet" ' not in results['.log.html'])
-        self.assertTrue('body {'                      in results['.log.html'])
+        self.assertTrue('body {' in results['.log.html'])
+
     def test_css_noembed(self):
-        extraConfig={'cssEmbed_minutes':False,
-                     'cssEmbed_log':False,}
+        extraConfig = {
+            'cssEmbed_minutes': False,
+            'cssEmbed_log': False,
+        }
         M = self.M_trivial(extraConfig=extraConfig)
         results = M.save()
-        self.assertTrue('<link rel="stylesheet" '     in results['.html'])
-        self.assertTrue('body {'                  not in results['.html'])
-        self.assertTrue('<link rel="stylesheet" '     in results['.log.html'])
-        self.assertTrue('body {'                  not in results['.log.html'])
+        self.assertTrue('<link rel="stylesheet" ' in results['.html'])
+        self.assertTrue('body {' not in results['.html'])
+        self.assertTrue('<link rel="stylesheet" ' in results['.log.html'])
+        self.assertTrue('body {' not in results['.log.html'])
+
     def test_css_file(self):
         tmpf = tempfile.NamedTemporaryFile()
         magic_string = '546uorck6o45tuo6'
         tmpf.write(magic_string)
         tmpf.flush()
-        extraConfig={'cssFile_minutes':  tmpf.name,
-                     'cssFile_log':      tmpf.name,}
+        extraConfig = {
+            'cssFile_minutes':  tmpf.name,
+            'cssFile_log': tmpf.name,
+        }
         M = self.M_trivial(extraConfig=extraConfig)
         results = M.save()
         self.assertTrue('<link rel="stylesheet" ' not in results['.html'])
-        self.assertTrue(magic_string                  in results['.html'])
+        self.assertTrue(magic_string in results['.html'])
         self.assertTrue('<link rel="stylesheet" ' not in results['.log.html'])
-        self.assertTrue(magic_string                  in results['.log.html'])
+        self.assertTrue(magic_string in results['.log.html'])
+
     def test_css_file_embed(self):
         tmpf = tempfile.NamedTemporaryFile()
         magic_string = '546uorck6o45tuo6'
         tmpf.write(magic_string)
         tmpf.flush()
-        extraConfig={'cssFile_minutes':  tmpf.name,
-                     'cssFile_log':      tmpf.name,
-                     'cssEmbed_minutes': False,
-                     'cssEmbed_log':     False,}
+        extraConfig = {
+            'cssFile_minutes': tmpf.name,
+            'cssFile_log': tmpf.name,
+            'cssEmbed_minutes': False,
+            'cssEmbed_log': False,
+        }
         M = self.M_trivial(extraConfig=extraConfig)
         results = M.save()
-        self.assertTrue('<link rel="stylesheet" '     in results['.html'])
-        self.assertTrue(tmpf.name                     in results['.html'])
-        self.assertTrue('<link rel="stylesheet" '     in results['.log.html'])
-        self.assertTrue(tmpf.name                     in results['.log.html'])
+        self.assertTrue('<link rel="stylesheet" ' in results['.html'])
+        self.assertTrue(tmpf.name in results['.html'])
+        self.assertTrue('<link rel="stylesheet" ' in results['.log.html'])
+        self.assertTrue(tmpf.name in results['.log.html'])
+
     def test_css_none(self):
         tmpf = tempfile.NamedTemporaryFile()
         magic_string = '546uorck6o45tuo6'
         tmpf.write(magic_string)
         tmpf.flush()
-        extraConfig={'cssFile_minutes':  'none',
-                     'cssFile_log':      'none',}
+        extraConfig = {
+            'cssFile_minutes':  'none',
+            'cssFile_log':      'none',
+        }
         M = self.M_trivial(extraConfig=extraConfig)
         results = M.save()
         self.assertTrue('<link rel="stylesheet" ' not in results['.html'])
         self.assertTrue('<style type="text/css" ' not in results['.html'])
         self.assertTrue('<link rel="stylesheet" ' not in results['.log.html'])
         self.assertTrue('<style type="text/css" ' not in results['.log.html'])
-
 
 
 if __name__ == '__main__':
@@ -127,4 +145,3 @@ if __name__ == '__main__':
                 MeetBotTest(methodName=testname).debug()
             else:
                 MeetBotTest(methodName='test_'+testname).debug()
-
