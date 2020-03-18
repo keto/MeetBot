@@ -134,7 +134,7 @@ def setup_config(OriginalConfig):
             # For a global value: conf.registerGlobalValue and remove the
             # channel= option from registryValue call above.
             conf.registerChannelValue(MeetBotConfigGroup, attrname,
-                                      registry.String(attr, ""))
+                                      registry.NormalizedString(attr, ""))
             settable_attributes.append(attrname)
         if isinstance(attr, bool):
             conf.registerChannelValue(MeetBotConfigGroup, attrname,
