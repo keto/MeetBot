@@ -101,9 +101,8 @@ class SupybotConfigProxy(object):
         # method will bypass the supybot proxy and just use default
         # values).  This will slow things down a little bit, but
         # that's just the cost of duing business.
-        if hasattr(value, 'im_func'):
-            return types.MethodType(
-                value.__func__, self, value.__self__.__class__)
+        if isinstance(value, types.MethodType):
+            return types.MethodType(value.__func__, self)
         return value
 
 
